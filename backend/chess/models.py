@@ -33,6 +33,7 @@ class Clock(models.Model):
         Game,
         on_delete=models.CASCADE,
         primary_key=True,
+        related_name='game_clock'
     )
 
     started_at = models.DateTimeField(auto_now_add=True)
