@@ -113,3 +113,6 @@ venv.bak/
 !.vscode/launch.json 
 !.vscode/extensions.json 
 .history
+
+# migrations
+backend/chess/migrations
