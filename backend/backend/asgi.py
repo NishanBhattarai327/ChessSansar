@@ -1,16 +1,11 @@
 import os
 
 from django.core.asgi import get_asgi_application
+from channels.routing import ProtocolTypeRouter, URLRouter
+from channels.auth import AuthMiddlewareStack
+from chess.routing import websocket_urlpatterns
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'backend.settings')
-
-application = get_asgi_application()
-
-
-import os
-
-from channels.routing import ProtocolTypeRouter
-from django.core.asgi import get_asgi_application
+from chess.middlewares import TokenAuthMiddleWare
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'mysite.settings')
 # Initialize Django ASGI application early to ensure the AppRegistry
@@ -19,5 +14,9 @@ django_asgi_app = get_asgi_application()
 
 application = ProtocolTypeRouter({
     "http": django_asgi_app,
-    # Just HTTP for now. (We can add other protocols later.)
+    "websocket": TokenAuthMiddleWare(
+        URLRouter(
+            websocket_urlpatterns
+        )
+    )
 })
