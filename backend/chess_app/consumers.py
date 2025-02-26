@@ -37,6 +37,14 @@ class ChessConsumer(WebsocketConsumer):
     
     def disconnect(self, close_code):
         if self.room_group_name:
+            if "user" in self.scope:
+                user = self.scope["user"]
+                if Game.objects.filter(room_id=self.game_id).exists():
+                    game = Game.objects.get(room_id=self.game_id)
+                    if game is not None:
+                        game.status = "waiting"
+                        game.save()
+                        print(f"change => game : {game.room_id}  status to {game.status}")
             async_to_sync(self.channel_layer.group_discard)(self.room_group_name, self.channel_name)
     
     def receive(self, text_data):
@@ -81,9 +89,10 @@ class ChessConsumer(WebsocketConsumer):
                 'message': 'Game created',
                 'game_id': self.game_id,
                 'clock': clock.total_time,
-                'username': user.username
+                'player1': user.username
             }))
         elif action == 'join_game':
+            print(f"{user.username} : action: join_game")
             game = Game.objects.get(room_id=self.game_id)
             if game is None:
                 self.send(text_data=json.dumps({
@@ -148,18 +157,29 @@ class ChessConsumer(WebsocketConsumer):
                     'message': 'Game is full'
                 }))
         elif action == 'make_move':
-            game = Game.objects.get(id=self.game_id)
+            game = Game.objects.get(room_id=self.game_id)
             if user != game.player1 and user != game.player2:
                 self.send(text_data=json.dumps({
                     'message': 'You are not a player in this game',
                     "username": user.username
                 }))
                 return
+            
+            if "move" not in data:
+                self.send(text_data=json.dumps({
+                    'message': 'No move to make',
+                }))
+                return
             move = data['move']
-            game = Game.objects.get(id=self.game_id)
+
+            game = Game.objects.get(room_id=self.game_id)
             board = chess.Board(fen=game.fen)
             try:
                 board.push(chess.Move.from_uci(move))
+                move_model = Move.objects.create(
+                    game=game,
+                    move=board.fen()
+                )
                 # Save new FEN and broadcast update
                 game.fen = board.fen()
                 game.current_turn = "player2" if user == game.player1 else "player1"
@@ -169,10 +189,13 @@ class ChessConsumer(WebsocketConsumer):
                 async_to_sync(self.channel_layer.group_send)(
                     self.room_group_name,
                     {
-                        'type': 'game.update',
-                        'move': move,
-                        'fen': game.fen,
-                        'current_turn': game.current_turn
+                        'type': 'game.send',
+                        "game": {
+                            'move': move,
+                            'fen': game.fen,
+                            'current_turn': game.current_turn
+                        },
+                        "message": ""
                     }
                 )
             except Exception as e:
