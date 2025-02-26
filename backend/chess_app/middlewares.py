@@ -21,7 +21,10 @@ class TokenAuthMiddleWare:
         query_string = scope["query_string"]
         query_params = query_string.decode()
         query_dict = parse_qs(query_params)
-        token = query_dict["token"][0]
-        user = await returnUser(token)
-        scope["user"] = user
+        if "token" in query_dict and query_dict["token"]:
+            token = query_dict["token"][0]
+            user = await returnUser(token)
+            scope["user"] = user
+        else:
+            scope["user"] = AnonymousUser()
         return await self.app(scope, receive, send)

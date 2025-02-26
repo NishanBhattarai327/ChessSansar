@@ -3,6 +3,8 @@ import datetime
 from django.contrib.auth.models import User
 
 class Game(models.Model):
+    room_id = models.CharField(max_length=24, primary_key=True, blank=True)
+
     player1 = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='player1')
     player2 = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='player2')
 
@@ -23,7 +25,7 @@ class Game(models.Model):
     format = models.CharField(max_length=10, choices=FORMAT_CHOICES, default='rapid')
     
     def __str__(self):
-        return f"Game {self.id} between {self.player1} and {self.player2} of format {self.format}"
+        return f"Game {self.room_id} between {self.player1} and {self.player2} of format {self.format}"
 
 class Clock(models.Model):
     DEFAULT_TOTAL_TIME = 15 * 60 * 1000  # 15 minutes in milliseconds
@@ -44,7 +46,7 @@ class Clock(models.Model):
     clock2 = models.IntegerField(default=DEFAULT_TOTAL_TIME, help_text="Player2 remaining time in ms")  # Clock for player2
 
     def __str__(self):
-        return f"Clock {self.total_time/(1000*60)}mins|+{self.incremental_time/1000}secs ({self.started_at}) game: {self.game}"
+        return f"Clock {self.total_time/(1000*60)}mins|+{self.incremental_time/1000}secs ({self.started_at}) game:"
     
 class Move(models.Model):
     game = models.ForeignKey(Game, on_delete=models.CASCADE, related_name='game_moves')
@@ -52,4 +54,4 @@ class Move(models.Model):
     played_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Played move {self.move} in game {self.game}"
+        return f"Played move {self.move} in game"

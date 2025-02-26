@@ -3,9 +3,9 @@ import os
 from django.core.asgi import get_asgi_application
 from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.auth import AuthMiddlewareStack
-from chess.routing import websocket_urlpatterns
+from chess_app.routing import websocket_urlpatterns
 
-from chess.middlewares import TokenAuthMiddleWare
+from chess_app.middlewares import TokenAuthMiddleWare
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'mysite.settings')
 # Initialize Django ASGI application early to ensure the AppRegistry

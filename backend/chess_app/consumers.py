@@ -1,9 +1,13 @@
 # consumers.py
 from channels.generic.websocket import WebsocketConsumer
-from .models import Game
+from .models import Game, Clock, Move
 import json
-import chess
 from asgiref.sync import async_to_sync
+
+import sys
+import site
+import chess
+
 
 class ChessConsumer(WebsocketConsumer):
     def connect(self):
@@ -28,6 +32,7 @@ class ChessConsumer(WebsocketConsumer):
             else:
                 self.close()
         else:
+            print(f"no user and received gameid = {self.game_id}")
             self.close()
     
     def disconnect(self, close_code):
@@ -40,13 +45,28 @@ class ChessConsumer(WebsocketConsumer):
         user = self.scope['user']
         
         if action == 'create_game':
+            base = data.get('base', None)
+            increment = data.get('increment', None)
+            if base is None or increment is None:
+                self.send(text_data=json.dumps({
+                    'message': 'provide base and increment'
+                }))
+                return
+            
             # Create a new game
-            if not Game.objects.filter(id=self.game_id).exists():
+            if not Game.objects.filter(room_id=self.game_id).exists():
                 game = Game.objects.create(
                     player1=user,
-                    id=self.game_id,
+                    room_id=self.game_id,
                     fen=chess.Board().fen(),
                     status="waiting"
+                )
+                clock = Clock.objects.create(
+                    game=game,
+                    total_time=base,
+                    incremental_time=increment,
+                    clock1=base,
+                    clock2=base
                 )
             else:
                 self.send(text_data=json.dumps({
@@ -60,10 +80,11 @@ class ChessConsumer(WebsocketConsumer):
             self.send(text_data=json.dumps({
                 'message': 'Game created',
                 'game_id': self.game_id,
+                'clock': clock.total_time,
                 'username': user.username
             }))
         elif action == 'join_game':
-            game = Game.objects.get(id=self.game_id)
+            game = Game.objects.get(room_id=self.game_id)
             if game is None:
                 self.send(text_data=json.dumps({
                     'message': 'Game does not exists'

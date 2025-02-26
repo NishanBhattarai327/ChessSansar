@@ -33,6 +33,7 @@ ALLOWED_HOSTS = ['127.0.0.1', '0.0.0.0', '192.168.1.168']
 # Application definition
 
 INSTALLED_APPS = [
+    'corsheaders',
     'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -40,7 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'chess',
+    'chess_app',
     'rest_framework',
     'rest_framework.authtoken',
     'djoser',
@@ -49,6 +50,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -147,10 +149,16 @@ REST_FRAMEWORK = {
 DJOSER = {
     'PASSWORD_RESET_CONFIRM_URL': '/password/reset/confirm/{uid}/{token}',
     'USERNAME_RESET_CONFIRM_URL': '/username/reset/confirm/{uid}/{token}',
-    'ACTIVATION_URL': '/activate/{uid}/{token}',
+    'ACTIVATION_URL': 'activate/{uid}/{token}',
     'SEND_ACTIVATION_EMAIL': True,
     'SEND_CONFIRMATION_EMAIL':True,
 }
+
+FRONTEND_API = os.environ.get('FRONTEND_API', None)
+if FRONTEND_API is not None:
+    DJOSER['EMAIL_FRONTEND_PROTOCOL'] = ''
+    DJOSER['EMAIL_FRONTEND_DOMAIN'] = FRONTEND_API
+    print(f'Frontend api: {FRONTEND_API}')
 
 # Email Configuration
 if (os.environ.get("EMAIL_TO_CONSOLE", "False") == 'True'):
@@ -164,3 +172,5 @@ else:
     EMAIL_HOST_USER = os.environ.get('EMAIL_USER')
     EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_PASS')
     EMAIL_USE_TLS = True
+
+CORS_ALLOW_ALL_ORIGINS = True
