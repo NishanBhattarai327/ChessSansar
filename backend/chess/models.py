@@ -3,8 +3,8 @@ import datetime
 from django.contrib.auth.models import User
 
 class Game(models.Model):
-    player1 = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='player1_games')
-    player2 = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='player2_games')
+    player1 = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='player1')
+    player2 = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='player2')
 
     TURN_CHOICES = [('player1', 'Player 1'), ('player2', 'Player 2')]
     current_turn = models.CharField(max_length=64, choices=TURN_CHOICES, default='player1')

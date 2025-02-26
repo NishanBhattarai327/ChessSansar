@@ -2,6 +2,14 @@ from rest_framework import serializers
 from .models import Game, Move, Clock
 
 class GameSerializer(serializers.ModelSerializer):
+    player1 = serializers.SlugRelatedField(
+        read_only=True,
+        slug_field="username"
+    )
+    player2 = serializers.SlugRelatedField(
+        read_only=True,
+        slug_field="username"
+    )
     game_moves = serializers.SlugRelatedField(
         many=True,
         read_only=True,

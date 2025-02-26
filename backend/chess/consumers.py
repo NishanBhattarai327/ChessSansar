@@ -10,8 +10,6 @@ class ChessConsumer(WebsocketConsumer):
         self.game_id = self.scope['url_route']['kwargs'].get('game_id')
         self.room_group_name = f'game_{self.game_id}' if self.game_id else None
         user = self.scope['user']
-        print(f"scope: {self.scope}")
-        print(f"User: {user}")
 
         if user.username:
             print(f"Connected to game {self.game_id} as {user.username}")
@@ -27,9 +25,15 @@ class ChessConsumer(WebsocketConsumer):
                     'message': 'Connected',
                     'username': user.username
                 }))
+            else:
+                self.close()
         else:
             self.close()
-
+    
+    def disconnect(self, close_code):
+        if self.room_group_name:
+            async_to_sync(self.channel_layer.group_discard)(self.room_group_name, self.channel_name)
+    
     def receive(self, text_data):
         data = json.loads(text_data)
         action = data.get('action')
@@ -41,7 +45,8 @@ class ChessConsumer(WebsocketConsumer):
                 game = Game.objects.create(
                     player1=user,
                     id=self.game_id,
-                    fen=chess.Board().fen()
+                    fen=chess.Board().fen(),
+                    status="waiting"
                 )
             else:
                 self.send(text_data=json.dumps({
@@ -59,8 +64,45 @@ class ChessConsumer(WebsocketConsumer):
             }))
         elif action == 'join_game':
             game = Game.objects.get(id=self.game_id)
+            if game is None:
+                self.send(text_data=json.dumps({
+                    'message': 'Game does not exists'
+                }))
+                return
+
+            # if game is not in waiting state return
+            if game.status != "waiting":
+                self.send(text_data=json.dumps({
+                    'message': 'Game is either end or active!!'
+                }))
+                return
+            
+            # reconnect the players if game is still in waiting status
+            if game.player1 == user or game.player2 == user:
+                async_to_sync(self.channel_layer.group_add)(
+                    self.room_group_name,
+                    self.channel_name
+                )
+                # Broadcast the join info to the group
+                async_to_sync(self.channel_layer.group_send)(
+                    self.room_group_name,
+                    {
+                        'type': 'game.send',
+                        'game': {
+                            'game_id': self.game_id,
+                            'player1': game.player1.username,
+                            'player2': game.player2.username,
+                            'current_turn': game.current_turn
+                        },
+                        'message': 'reconnected'
+                    }
+                )
+                return
+
+
             if game.player2 is None:
                 game.player2 = user
+                game.status = "active"
                 game.save()
                 async_to_sync(self.channel_layer.group_add)(
                     self.room_group_name,
@@ -70,12 +112,14 @@ class ChessConsumer(WebsocketConsumer):
                 async_to_sync(self.channel_layer.group_send)(
                     self.room_group_name,
                     {
-                        'type': 'game.update',
-                        'player1': game.player1.username,
-                        'player2': game.player2.username,
-                        'current_turn': game.current_turn,
-                        'message': 'Joined game',
-                        'game_id': self.game_id,
+                        'type': 'game.send',
+                        'game': {
+                            'game_id': self.game_id,
+                            'player1': game.player1.username,
+                            'player2': game.player2.username,
+                            'current_turn': game.current_turn,
+                        },
+                        'message': 'Joined game'
                     }
                 )
             else:
@@ -114,6 +158,14 @@ class ChessConsumer(WebsocketConsumer):
                 self.send(text_data=json.dumps({
                     'message': str(e)
                 }))
+
+    def game_send(self, event):
+        message = event['message']
+        game = event['game']
+        self.send(text_data=json.dumps({
+            "message": message,
+            "game": game
+        }))
 
     def game_update(self, event):
         # Send updates to all clients in the group
