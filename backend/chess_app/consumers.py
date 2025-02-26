@@ -93,7 +93,10 @@ class ChessConsumer(WebsocketConsumer):
             }))
         elif action == 'join_game':
             print(f"{user.username} : action: join_game")
-            game = Game.objects.get(room_id=self.game_id)
+            try:
+                game = Game.objects.get(room_id=self.game_id)
+            except Game.DoesNotExist:
+                game = None
             if game is None:
                 self.send(text_data=json.dumps({
                     'message': 'Game does not exists'
@@ -120,6 +123,7 @@ class ChessConsumer(WebsocketConsumer):
                         'type': 'game.send',
                         'game': {
                             'game_id': self.game_id,
+                            'fen': game.fen,
                             'player1': game.player1.username,
                             'player2': game.player2.username,
                             'current_turn': game.current_turn
@@ -186,6 +190,7 @@ class ChessConsumer(WebsocketConsumer):
                 game.save()
 
                 # Broadcast the move to the group
+                player_username = game.current_turn == "player1"
                 async_to_sync(self.channel_layer.group_send)(
                     self.room_group_name,
                     {
@@ -195,7 +200,7 @@ class ChessConsumer(WebsocketConsumer):
                             'fen': game.fen,
                             'current_turn': game.current_turn
                         },
-                        "message": ""
+                        "message": "move"
                     }
                 )
             except Exception as e:
