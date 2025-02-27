@@ -113,7 +113,7 @@ class ChessConsumer(WebsocketConsumer):
                 },
                 'message': {
                     'type': 'only_me',
-                    'info': 'game created',
+                    'info': 'created',
                     'player': {
                         'user': user.username,
                         'color': game.player1_color,
@@ -210,7 +210,7 @@ class ChessConsumer(WebsocketConsumer):
                         },
                         'message': {
                             'type': 'both',
-                            'info': 'joined game',
+                            'info': 'joined',
                             'player': {
                                 'user': user.username,
                                 'color': game.player2_color
@@ -231,7 +231,22 @@ class ChessConsumer(WebsocketConsumer):
         
 
         elif action == 'make_move':
-            game = Game.objects.get(room_id=self.game_id)
+            try:
+                game = Game.objects.get(room_id=self.game_id)
+            except Game.DoesNotExist:
+                game = None
+            if game is None:
+                self.send(text_data=json.dumps({
+                    'game': {},
+                    'message': {
+                        'type': 'only_me',
+                        'info': 'invalid',
+                        'error': 'Game does not exists',
+                        'player': {}
+                    }
+                }))
+                return
+
             if user != game.player1 and user != game.player2:
                 self.send(text_data=json.dumps({
                     'game': {},
