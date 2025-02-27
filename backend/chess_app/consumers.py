@@ -171,7 +171,7 @@ class ChessConsumer(WebsocketConsumer):
                             'fen': game.fen,
                             'player1': game.player1.username,
                             'player1_color': game.player1_color,
-                            'player2': game.player2.username,
+                            'player2': game.player2.username if game.player2 else 'null',
                             'player2_color': game.player2_color,
                             'current_turn': game.current_turn
                         },
