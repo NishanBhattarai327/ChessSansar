@@ -226,6 +226,7 @@ class ChessConsumer(WebsocketConsumer):
                             'player2': game.player2.username,
                             'player2_color': game.player2_color,
                             'current_turn': game.current_turn,
+                            'status': game.status
                         },
                         'message': {
                             'type': 'both',
@@ -303,10 +304,25 @@ class ChessConsumer(WebsocketConsumer):
                 }))
                 return
 
-            move = data['move']
             try:
+                move = data['move']
                 game = Game.objects.get(room_id=self.game_id)
                 color = game.player1_color if game.player1 == user else game.player2_color   # color of the move maker
+                
+                if game.status == 'ended':
+                    self.send(text_data=json.dumps({
+                        'game': {},
+                        'message': {
+                            'type': 'only_me',
+                            'info': 'invalid',
+                            'error': "game has already ended",
+                            'player': {
+                                'user': user.username,
+                                'color': color
+                            }
+                        }
+                    }))
+                    return
 
                 board = chess.Board(fen=game.fen)
                 chess_move = chess.Move.from_uci(move)
@@ -330,9 +346,31 @@ class ChessConsumer(WebsocketConsumer):
                     game=game,
                     move=move
                 )
-                # Save new FEN and broadcast update
+
+                # add new FEN to game and check if game if over or not
                 game.fen = board.fen()
                 game.current_turn = "player2" if user == game.player1 else "player1"
+                
+                outcome = board.outcome()
+                if outcome:
+                    over_type = ''
+                    winner = ''
+                    if outcome.winner == chess.WHITE:
+                        print("white won")
+                        over_type = 'checkmate'
+                        winner = 'player1' if game.player1_color == 'white' else 'player2'
+
+                    elif outcome.winner == chess.BLACK:
+                        over_type = 'checkmate'
+                        winner = 'player1' if game.player1_color == 'black' else 'player2'
+                        print("black won")
+
+                    else:
+                        over_type = 'draw'
+                        print("draw")
+                    game.status = 'ended'
+                    game.over_type = over_type
+                    game.winner = winner
                 game.save()
 
                 # Broadcast the move to the group
@@ -348,6 +386,9 @@ class ChessConsumer(WebsocketConsumer):
                             'player2': game.player2.username,
                             'player2_color': game.player2_color,
                             'current_turn': game.current_turn,
+                            'status': game.status,
+                            'winner': game.winner,
+                            'over_type': game.over_type
                         },
                         'message': {
                             'type': 'both',
@@ -367,8 +408,7 @@ class ChessConsumer(WebsocketConsumer):
                         'info': 'invalid',
                         'error': str(e),
                         'player': {
-                            'user': user.username,
-                            'color': color
+                            'user': user.username
                         }
                     }
                 }))
