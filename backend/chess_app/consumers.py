@@ -51,9 +51,21 @@ class ChessConsumer(WebsocketConsumer):
             async_to_sync(self.channel_layer.group_discard)(self.room_group_name, self.channel_name)
     
     def receive(self, text_data):
-        data = json.loads(text_data)
-        action = data.get('action')
-        user = self.scope['user']
+        try:
+            data = json.loads(text_data)
+            action = data.get('action')
+            user = self.scope['user']
+        except Exception as e:
+            self.send(text_data=json.dumps({
+                'game': {},
+                'message': {
+                    'type': 'only_me',
+                    'info': 'invalid',
+                    'error': f'{e}',
+                    'player': {}
+                } 
+            }))
+            return
         
         if action == 'create_game':
             base = data.get('base', None)
@@ -162,6 +174,12 @@ class ChessConsumer(WebsocketConsumer):
                 color = game.player1_color if game.player1 == user else game.player2_color
             
                 # Broadcast the join info to the group
+                # Get all moves for this game
+                moves = list(Move.objects.filter(game=game).values('move', 'played_at'))
+                # Convert datetime to string format
+                for move in moves:
+                    move['played_at'] = move['played_at'].isoformat() if move['played_at'] else None
+
                 async_to_sync(self.channel_layer.group_send)(
                     self.room_group_name,
                     {
@@ -173,7 +191,8 @@ class ChessConsumer(WebsocketConsumer):
                             'player1_color': game.player1_color,
                             'player2': game.player2.username if game.player2 else 'null',
                             'player2_color': game.player2_color,
-                            'current_turn': game.current_turn
+                            'current_turn': game.current_turn,
+                            'moves': moves
                         },
                         'message': {
                             'type': 'both',
@@ -285,14 +304,31 @@ class ChessConsumer(WebsocketConsumer):
                 return
 
             move = data['move']
-            game = Game.objects.get(room_id=self.game_id)
-            board = chess.Board(fen=game.fen)
-            color = game.player1_color if game.player1 == user else game.player2_color   # color of the move maker
             try:
-                board.push(chess.Move.from_uci(move))
+                game = Game.objects.get(room_id=self.game_id)
+                color = game.player1_color if game.player1 == user else game.player2_color   # color of the move maker
+
+                board = chess.Board(fen=game.fen)
+                chess_move = chess.Move.from_uci(move)
+                if chess_move not in board.legal_moves:
+                    self.send(text_data=json.dumps({
+                        'game': {},
+                        'message': {
+                            'type': 'only_me',
+                            'info': 'invalid',
+                            'error': "illegal move",
+                            'player': {
+                                'user': user.username,
+                                'color': color
+                            }
+                        }
+                    }))
+                    return
+                
+                board.push(chess_move)
                 move_model = Move.objects.create(
                     game=game,
-                    move=board.fen()
+                    move=move
                 )
                 # Save new FEN and broadcast update
                 game.fen = board.fen()
