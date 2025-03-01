@@ -22,10 +22,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY')
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-aip%c(^4n%$8*jb2@#8r2h&b_3(%*_22$ds6e42gc5@h8_&(zh')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = (os.getenv('DEBUG', 'False') == 'True')
+DEBUG = (os.getenv('DJANGO_DEBUG', 'False') == 'True')
 
 ALLOWED_HOSTS = ['127.0.0.1', '0.0.0.0', '192.168.1.168']
 
@@ -154,14 +154,14 @@ DJOSER = {
     'SEND_CONFIRMATION_EMAIL':True,
 }
 
-FRONTEND_API = os.environ.get('FRONTEND_API', None)
+FRONTEND_API = os.environ.get('DJANGO_FRONTEND_API', None)
 if FRONTEND_API is not None:
     DJOSER['EMAIL_FRONTEND_PROTOCOL'] = ''
     DJOSER['EMAIL_FRONTEND_DOMAIN'] = FRONTEND_API
     print(f'Frontend api: {FRONTEND_API}')
 
 # Email Configuration
-if (os.environ.get("EMAIL_TO_CONSOLE", "False") == 'True'):
+if (os.environ.get("DJANGO_EMAIL_TO_CONSOLE", "False") == 'True'):
     print("USING CONSOLE AS EMAIL RECEIVER")
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 else:
@@ -169,8 +169,8 @@ else:
     EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
     EMAIL_HOST = 'smtp.gmail.com'
     EMAIL_PORT = 587
-    EMAIL_HOST_USER = os.environ.get('EMAIL_USER')
-    EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_PASS')
+    EMAIL_HOST_USER = os.environ.get('DJANGO_EMAIL_USER')
+    EMAIL_HOST_PASSWORD = os.environ.get('DJANGO_EMAIL_PASS')
     EMAIL_USE_TLS = True
 
 CORS_ALLOW_ALL_ORIGINS = True
