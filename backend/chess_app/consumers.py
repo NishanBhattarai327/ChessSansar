@@ -259,6 +259,24 @@ class ChessConsumer(WebsocketConsumer):
                         }
                     }
                 )
+                
+                # broadcast the game status to avialable_games room
+                async_to_sync(self.channel_layer.group_send)(
+                    'available_games',
+                    {
+                        'type': 'game.update',
+                        'game': {
+                            'game_id': self.game_id,
+                        },
+                        'message': {
+                            'type': 'all',
+                            'info': 'unavailable',
+                            'player': {
+                                'user': user.username
+                            }
+                        }
+                    }
+                )
             else:
                 self.send(text_data=json.dumps({
                     'game': {},
@@ -466,6 +484,8 @@ class ChessRoomConsumer(WebsocketConsumer):
             games_list = [{
                 'game_id': game.room_id,
                 'player1': game.player1.username,
+                'player1_color': game.player1_color,
+                'player2_color': game.player2_color
             } for game in available_games]
 
             self.send(text_data=json.dumps({ 
