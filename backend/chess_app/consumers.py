@@ -251,6 +251,7 @@ class ChessConsumer(WebsocketConsumer):
         
 
         elif action == 'make_move':
+            print(f"{user.username} : action: make_move")
             try:
                 game = Game.objects.get(room_id=self.game_id)
             except Game.DoesNotExist:
@@ -306,6 +307,7 @@ class ChessConsumer(WebsocketConsumer):
 
             try:
                 move = data['move']
+                print(f'{user.username} :: make_move :: move : {move}')
                 game = Game.objects.get(room_id=self.game_id)
                 color = game.player1_color if game.player1 == user else game.player2_color   # color of the move maker
                 
@@ -381,6 +383,7 @@ class ChessConsumer(WebsocketConsumer):
                         'game': {
                             'game_id': self.game_id,
                             'fen': game.fen,
+                            'move': move,
                             'player1': game.player1.username,
                             'player1_color': game.player1_color,
                             'player2': game.player2.username,

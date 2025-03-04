@@ -56,4 +56,4 @@ class Move(models.Model):
     played_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Played move {self.move} in game"
+        return f"Played move {self.move} in game {self.game.room_id}"
