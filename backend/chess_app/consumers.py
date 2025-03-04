@@ -114,6 +114,27 @@ class ChessConsumer(WebsocketConsumer):
                 self.room_group_name,
                 self.channel_name
             )
+            # Also send message to available room group
+            async_to_sync(self.channel_layer.group_send)(
+                'available_games',
+                {
+                    'type': 'game.update',
+                    'game': {
+                        'game_id': self.game_id,
+                        'player1': game.player1.username,
+                        'player1_color': game.player1_color,
+                        'player2_color': game.player2_color,
+                        'current_turn': game.current_turn,
+                    },
+                    'message': {
+                        'type': 'all',
+                        'info': 'available',
+                        'player': {
+                            'user': user.username
+                        }
+                    }
+                }
+            )
             self.send(text_data=json.dumps({
                 'game': {
                     'game_id': self.game_id,
@@ -422,4 +443,54 @@ class ChessConsumer(WebsocketConsumer):
         self.send(text_data=json.dumps({
             "message": message,
             "game": game
+        }))
+
+
+
+class ChessRoomConsumer(WebsocketConsumer):
+    def connect(self):
+        self.room_group_name = 'available_games'
+        user = self.scope['user']
+
+        if user.username:
+            print(f"Connected to room {self.room_group_name} as {user.username}")
+
+            async_to_sync(self.channel_layer.group_add)(
+                self.room_group_name,
+                self.channel_name
+            )
+            self.accept()
+            
+            # Send current available games on connect
+            available_games = Game.objects.filter(status='waiting')
+            games_list = [{
+                'game_id': game.room_id,
+                'player1': game.player1.username,
+            } for game in available_games]
+
+            self.send(text_data=json.dumps({ 
+                'games': games_list,
+                'message': {
+                    'type': 'only_me',
+                    'info': 'connected',
+                    'player': {
+                        'user': user.username
+                    }
+                }
+            }))
+    
+    def disconnect(self, code):
+        async_to_sync(self.channel_layer.group_discard)(
+            self.room_group_name,
+            self.channel_name
+        )
+    
+    def receive(self, text_data):
+        pass
+
+    def game_update(self, event):
+        """Handle game updates from database"""
+        self.send(text_data=json.dumps({
+            'game': event['game'],
+            'message': event['message']
         }))
