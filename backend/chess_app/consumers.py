@@ -52,7 +52,7 @@ class ChessConsumer(WebsocketConsumer):
                                 game.player2_connected = False
                             game.status = "waiting"
                             game.save()
-                            print(f"change => game : {game.room_id}  status to {game.status}, p1: {game.player1_status} p2: {game.player2_status}")
+                            print(f"change => game : {game.room_id}  status to {game.status}, p1: {game.player1_connected} p2: {game.player2_connected}")
             async_to_sync(self.channel_layer.group_discard)(self.room_group_name, self.channel_name)
     
     def receive(self, text_data):
