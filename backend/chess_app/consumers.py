@@ -76,13 +76,16 @@ class ChessConsumer(WebsocketConsumer):
             print(f"{user.username} : action: create_game")
             base = data.get('base', None)
             increment = data.get('increment', None)
+            p1_color = data.get('color', 'white')
+            p2_color = 'black' if p1_color == 'white' else 'white'
+            curr_turn = 'player1' if p1_color == 'white' else 'player2'
             if base is None or increment is None:
                 self.send(text_data=json.dumps({
                     'game': {},
                     'message': {
                         'type': 'only_me',
                         'info': 'invalid',
-                        'error': 'provide base and increment',
+                        'error': 'provide base, increment time',
                         'player': {}
                     } 
                 }))
@@ -93,7 +96,10 @@ class ChessConsumer(WebsocketConsumer):
                 # Todo : ask user of color of player 1 (defualt is white)
                 game = Game.objects.create(
                     player1=user,
+                    player1_color=p1_color,
                     player1_connected=True,
+                    player2_color=p2_color,
+                    current_turn=curr_turn,
                     room_id=self.game_id,
                     fen=chess.Board().fen(),
                     status="waiting"
@@ -128,6 +134,10 @@ class ChessConsumer(WebsocketConsumer):
                     'type': 'game.update',
                     'game': {
                         'game_id': self.game_id,
+                        'clock': {
+                            'base': clock.total_time,
+                            'increment': clock.incremental_time
+                        },
                         'player1': game.player1.username,
                         'player1_color': game.player1_color,
                         'player2_color': game.player2_color,
@@ -145,8 +155,10 @@ class ChessConsumer(WebsocketConsumer):
             self.send(text_data=json.dumps({
                 'game': {
                     'game_id': self.game_id,
-                    'base': clock.total_time,
-                    'increment': clock.incremental_time,
+                    'clock': {
+                        'base': clock.total_time,
+                        'increment': clock.incremental_time
+                    },
                     'player1': user.username,
                     'player1_color': game.player1_color,
                     'player2_color': game.player2_color
