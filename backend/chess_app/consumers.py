@@ -46,9 +46,13 @@ class ChessConsumer(WebsocketConsumer):
                     game = Game.objects.get(room_id=self.game_id)
                     if game is not None:
                         if game.status != 'ended':
+                            if user == game.player1:
+                                game.player1_connected = False
+                            if user == game.player2:
+                                game.player2_connected = False
                             game.status = "waiting"
                             game.save()
-                            print(f"change => game : {game.room_id}  status to {game.status}")
+                            print(f"change => game : {game.room_id}  status to {game.status}, p1: {game.player1_status} p2: {game.player2_status}")
             async_to_sync(self.channel_layer.group_discard)(self.room_group_name, self.channel_name)
     
     def receive(self, text_data):
@@ -69,6 +73,7 @@ class ChessConsumer(WebsocketConsumer):
             return
         
         if action == 'create_game':
+            print(f"{user.username} : action: create_game")
             base = data.get('base', None)
             increment = data.get('increment', None)
             if base is None or increment is None:
@@ -88,6 +93,7 @@ class ChessConsumer(WebsocketConsumer):
                 # Todo : ask user of color of player 1 (defualt is white)
                 game = Game.objects.create(
                     player1=user,
+                    player1_connected=True,
                     room_id=self.game_id,
                     fen=chess.Board().fen(),
                     status="waiting"
@@ -173,7 +179,7 @@ class ChessConsumer(WebsocketConsumer):
                 }))
                 return
 
-            # if game is not in waiting state return
+            # if game is in active state return (playing)
             if game.status == "active":
                 self.send(text_data=json.dumps({
                     'game': {},
@@ -193,6 +199,8 @@ class ChessConsumer(WebsocketConsumer):
                     self.channel_name
                 )
                 color = game.player1_color if game.player1 == user else game.player2_color
+                if game.player1 == user: game.player1_connected = True
+                elif game.player2 == user: game.player2_connected = True
             
                 # Broadcast the join info to the group
                 # Get all moves for this game
@@ -201,14 +209,10 @@ class ChessConsumer(WebsocketConsumer):
                 for move in moves:
                     move['played_at'] = move['played_at'].isoformat() if move['played_at'] else None
                 
-                # change the status of game and save it
-                # Get list of all channel names in the group
-                channel_names = async_to_sync(self.channel_layer.group_channels)(self.room_group_name)
-                print(f'reconnected:: channels_names: {channel_names}')
-                # If both players are connected (2 channels in group), set status to active
-                if len(channel_names) == 2:
+                # If both players are connected (alive ws connection), set status to active
+                if game.player1_connected and game.player2_connected:
                     game.status = 'active'
-                    game.save()
+                game.save()
 
                 async_to_sync(self.channel_layer.group_send)(
                     self.room_group_name,
@@ -220,8 +224,10 @@ class ChessConsumer(WebsocketConsumer):
                             'fen': game.fen,
                             'player1': game.player1.username,
                             'player1_color': game.player1_color,
+                            'player1_connected': game.player1_connected,
                             'player2': game.player2.username if game.player2 else 'null',
                             'player2_color': game.player2_color,
+                            'player2_connected': game.player2_connected,
                             'current_turn': game.current_turn,
                             'moves': moves,
                         },
@@ -239,12 +245,9 @@ class ChessConsumer(WebsocketConsumer):
             
             if game.player2 is None:
                 game.player2 = user
-                # change the status of game and save it
-                # Get list of all channel names in the group
-                channel_names = async_to_sync(self.channel_layer.group_channels)(self.room_group_name)
-                print(f'joined:: channels_names: {channel_names}')
-                # If both players are connected (2 channels in group), set status to active
-                if len(channel_names) == 2:
+                game.player2_connected = True
+                # If both players are connected (player1 is also connected to ws), set status to active
+                if game.player1_connected:
                     game.status = 'active'
                 game.save()
 
@@ -309,6 +312,7 @@ class ChessConsumer(WebsocketConsumer):
             print(f"{user.username} : action: make_move")
             try:
                 game = Game.objects.get(room_id=self.game_id)
+                color = game.player1_color if game.player1 == user else game.player2_color   # color of the move maker
             except Game.DoesNotExist:
                 game = None
             if game is None:
@@ -330,6 +334,33 @@ class ChessConsumer(WebsocketConsumer):
                         'type': 'only_me',
                         'info': 'invalid',
                         'error': 'You are not a player in this game',
+                        'player': {}
+                    }
+                }))
+                return
+            
+            if game.status == 'ended':
+                self.send(text_data=json.dumps({
+                    'game': {},
+                    'message': {
+                        'type': 'only_me',
+                        'info': 'invalid',
+                        'error': "game has already ended",
+                        'player': {
+                            'user': user.username,
+                            'color': color
+                        }
+                    }
+                }))
+                return
+            
+            if game.status != 'active':
+                self.send(text_data=json.dumps({
+                    'game': {},
+                    'message': {
+                        'type': 'only_me',
+                        'info': 'invalid',
+                        'error': 'Game is not active',
                         'player': {}
                     }
                 }))
@@ -363,23 +394,6 @@ class ChessConsumer(WebsocketConsumer):
             try:
                 move = data['move']
                 print(f'{user.username} :: make_move :: move : {move}')
-                game = Game.objects.get(room_id=self.game_id)
-                color = game.player1_color if game.player1 == user else game.player2_color   # color of the move maker
-                
-                if game.status == 'ended':
-                    self.send(text_data=json.dumps({
-                        'game': {},
-                        'message': {
-                            'type': 'only_me',
-                            'info': 'invalid',
-                            'error': "game has already ended",
-                            'player': {
-                                'user': user.username,
-                                'color': color
-                            }
-                        }
-                    }))
-                    return
 
                 board = chess.Board(fen=game.fen)
                 chess_move = chess.Move.from_uci(move)
