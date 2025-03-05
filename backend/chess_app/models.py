@@ -7,8 +7,14 @@ class Game(models.Model):
 
     player1 = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='player1')
     player1_color = models.CharField(max_length=10, default="white")
+
     player2 = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='player2')
     player2_color = models.CharField(max_length=10, default="black")
+    
+    # infomation about where the players are connected or not to the game
+    PLAYER_STATUS_CHOICES = [('connected', 'Connected'), ('disconnected', 'Disconnected')]
+    player1_status = models.CharField(max_length=16, choices=PLAYER_STATUS_CHOICES, default='disconnected')
+    player2_status = models.CharField(max_length=16, choices=PLAYER_STATUS_CHOICES, default='disconnected')
 
     TURN_CHOICES = [('player1', 'Player 1'), ('player2', 'Player 2')]
     current_turn = models.CharField(max_length=64, choices=TURN_CHOICES, default='player1')
