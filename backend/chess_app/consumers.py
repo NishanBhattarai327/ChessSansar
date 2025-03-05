@@ -45,9 +45,10 @@ class ChessConsumer(WebsocketConsumer):
                 if Game.objects.filter(room_id=self.game_id).exists():
                     game = Game.objects.get(room_id=self.game_id)
                     if game is not None:
-                        game.status = "waiting"
-                        game.save()
-                        print(f"change => game : {game.room_id}  status to {game.status}")
+                        if game.status != 'ended':
+                            game.status = "waiting"
+                            game.save()
+                            print(f"change => game : {game.room_id}  status to {game.status}")
             async_to_sync(self.channel_layer.group_discard)(self.room_group_name, self.channel_name)
     
     def receive(self, text_data):
@@ -154,7 +155,6 @@ class ChessConsumer(WebsocketConsumer):
                 }
             }))
 
-        
         elif action == 'join_game':
             print(f"{user.username} : action: join_game")
             try:
@@ -174,13 +174,13 @@ class ChessConsumer(WebsocketConsumer):
                 return
 
             # if game is not in waiting state return
-            if game.status != "waiting":
+            if game.status == "active":
                 self.send(text_data=json.dumps({
                     'game': {},
                     'message': {
                         'type': 'only_me',
                         'info': 'invalid',
-                        'error': 'Game is either end or active!!',
+                        'error': 'Game is active!!',
                         'player': {}
                     }
                 }))
@@ -200,6 +200,15 @@ class ChessConsumer(WebsocketConsumer):
                 # Convert datetime to string format
                 for move in moves:
                     move['played_at'] = move['played_at'].isoformat() if move['played_at'] else None
+                
+                # change the status of game and save it
+                # Get list of all channel names in the group
+                channel_names = async_to_sync(self.channel_layer.group_channels)(self.room_group_name)
+                print(f'reconnected:: channels_names: {channel_names}')
+                # If both players are connected (2 channels in group), set status to active
+                if len(channel_names) == 2:
+                    game.status = 'active'
+                    game.save()
 
                 async_to_sync(self.channel_layer.group_send)(
                     self.room_group_name,
@@ -207,13 +216,14 @@ class ChessConsumer(WebsocketConsumer):
                         'type': 'game.send',
                         'game': {
                             'game_id': self.game_id,
+                            'status': game.status,
                             'fen': game.fen,
                             'player1': game.player1.username,
                             'player1_color': game.player1_color,
                             'player2': game.player2.username if game.player2 else 'null',
                             'player2_color': game.player2_color,
                             'current_turn': game.current_turn,
-                            'moves': moves
+                            'moves': moves,
                         },
                         'message': {
                             'type': 'both',
@@ -229,8 +239,15 @@ class ChessConsumer(WebsocketConsumer):
             
             if game.player2 is None:
                 game.player2 = user
-                game.status = "active"
+                # change the status of game and save it
+                # Get list of all channel names in the group
+                channel_names = async_to_sync(self.channel_layer.group_channels)(self.room_group_name)
+                print(f'joined:: channels_names: {channel_names}')
+                # If both players are connected (2 channels in group), set status to active
+                if len(channel_names) == 2:
+                    game.status = 'active'
                 game.save()
+
                 async_to_sync(self.channel_layer.group_add)(
                     self.room_group_name,
                     self.channel_name
@@ -242,12 +259,12 @@ class ChessConsumer(WebsocketConsumer):
                         'type': 'game.send',
                         'game': {
                             'game_id': self.game_id,
+                            'status': game.status,
                             'player1': game.player1.username,
                             'player1_color': game.player1_color,
                             'player2': game.player2.username,
                             'player2_color': game.player2_color,
                             'current_turn': game.current_turn,
-                            'status': game.status
                         },
                         'message': {
                             'type': 'both',
@@ -288,7 +305,6 @@ class ChessConsumer(WebsocketConsumer):
                     }
                 }))
         
-
         elif action == 'make_move':
             print(f"{user.username} : action: make_move")
             try:
@@ -454,6 +470,83 @@ class ChessConsumer(WebsocketConsumer):
                         }
                     }
                 }))
+
+        elif action == 'resign_game':
+            try:
+                game = Game.objects.get(room_id=self.game_id)
+            except Game.DoesNotExist:
+                self.send(text_data=json.dumps({
+                    'game': {},
+                    'message': {
+                        'type': 'only_me',
+                        'info': 'invalid',
+                        'error': 'Game does not exist',
+                        'player': {}
+                    }
+                }))
+                return
+
+            if user != game.player1 and user != game.player2:
+                self.send(text_data=json.dumps({
+                    'game': {},
+                    'message': {
+                        'type': 'only_me',
+                        'info': 'invalid',
+                        'error': 'You are not a player in this game',
+                        'player': {}
+                    }
+                }))
+                return
+
+            if game.status == 'ended':
+                self.send(text_data=json.dumps({
+                    'game': {},
+                    'message': {
+                        'type': 'only_me',
+                        'info': 'invalid',
+                        'error': 'Game has already ended',
+                        'player': {}
+                    }
+                }))
+                return
+
+            # Set game as ended and declare winner
+            game.status = 'ended'
+            game.over_type = 'resign'
+            game.winner = 'player2' if user == game.player1 else 'player1'
+            game.save()
+
+            user_color = game.player1_color if user == game.player1 else game.player2_color
+            winner_color = game.player1_color if user == game.player2 else game.player2_color
+
+            # Broadcast resignation to both players
+            async_to_sync(self.channel_layer.group_send)(
+                self.room_group_name,
+                {
+                    'type': 'game.send',
+                    'game': {
+                        'game_id': self.game_id,
+                        'status': game.status,
+                        'winner': game.winner,
+                        'color': winner_color,
+                        'over_type': game.over_type
+                    },
+                    'message': {
+                        'type': 'both',
+                        'info': 'resigned',
+                        'player': {
+                            'user': user.username,
+                            'color': user_color
+                        }
+                    }
+                }
+            )
+
+        elif action == 'abort_game':
+            pass
+
+        elif action == 'draw_request':
+            pass
 
     def game_send(self, event):
         message = event['message']
