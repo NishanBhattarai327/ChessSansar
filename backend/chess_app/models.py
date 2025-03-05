@@ -12,9 +12,8 @@ class Game(models.Model):
     player2_color = models.CharField(max_length=10, default="black")
     
     # infomation about where the players are connected or not to the game
-    PLAYER_STATUS_CHOICES = [('connected', 'Connected'), ('disconnected', 'Disconnected')]
-    player1_status = models.CharField(max_length=16, choices=PLAYER_STATUS_CHOICES, default='disconnected')
-    player2_status = models.CharField(max_length=16, choices=PLAYER_STATUS_CHOICES, default='disconnected')
+    player1_connected = models.BooleanField(default=False)
+    player2_connected = models.BooleanField(default=False)
 
     TURN_CHOICES = [('player1', 'Player 1'), ('player2', 'Player 2')]
     current_turn = models.CharField(max_length=64, choices=TURN_CHOICES, default='player1')
