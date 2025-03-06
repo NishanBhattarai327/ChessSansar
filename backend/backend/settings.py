@@ -153,7 +153,7 @@ FRONTEND_API = os.environ.get('DJANGO_FRONTEND_API', None)
 if FRONTEND_API is not None:
     DJOSER['EMAIL_FRONTEND_PROTOCOL'] = ''
     DJOSER['EMAIL_FRONTEND_DOMAIN'] = FRONTEND_API
-    print(f'Frontend api: {FRONTEND_API}')
+    if dev_flag: print(f'Frontend api: {FRONTEND_API}')
 
 # Email Configuration
 if (os.environ.get("DJANGO_EMAIL_TO_CONSOLE", "False") == 'True'):
