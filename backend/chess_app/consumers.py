@@ -76,6 +76,7 @@ class ChessConsumer(WebsocketConsumer):
             print(f"{user.username} : action: create_game")
             base = data.get('base', None)
             increment = data.get('increment', None)
+            format = data.get('format', 'custom')
             p1_color = data.get('color', 'white')
             p2_color = 'black' if p1_color == 'white' else 'white'
             curr_turn = 'player1' if p1_color == 'white' else 'player2'
@@ -101,6 +102,7 @@ class ChessConsumer(WebsocketConsumer):
                     player2_color=p2_color,
                     current_turn=curr_turn,
                     room_id=self.game_id,
+                    format=format,
                     fen=chess.Board().fen(),
                     status="waiting"
                 )
@@ -134,9 +136,11 @@ class ChessConsumer(WebsocketConsumer):
                     'type': 'game.update',
                     'game': {
                         'game_id': self.game_id,
+                        'format': game.format,
                         'clock': {
                             'base': clock.total_time,
-                            'increment': clock.incremental_time
+                            'increment': clock.incremental_time,
+                            'started': clock.started_at.isoformat()
                         },
                         'player1': game.player1.username,
                         'player1_color': game.player1_color,
@@ -152,6 +156,7 @@ class ChessConsumer(WebsocketConsumer):
                     }
                 }
             )
+
             self.send(text_data=json.dumps({
                 'game': {
                     'game_id': self.game_id,
@@ -221,8 +226,8 @@ class ChessConsumer(WebsocketConsumer):
                 for move in moves:
                     move['played_at'] = move['played_at'].isoformat() if move['played_at'] else None
                 
-                # If both players are connected (alive ws connection), set status to active
-                if game.player1_connected and game.player2_connected:
+                # If both players are connected (alive ws connection) and game is not ended, set status to active
+                if game.player1_connected and game.player2_connected and game.status != 'ended':
                     game.status = 'active'
                 game.save()
 
@@ -233,6 +238,8 @@ class ChessConsumer(WebsocketConsumer):
                         'game': {
                             'game_id': self.game_id,
                             'status': game.status,
+                            'winner': game.winner,
+                            'over_type': game.over_type,
                             'fen': game.fen,
                             'player1': game.player1.username,
                             'player1_color': game.player1_color,
@@ -568,11 +575,25 @@ class ChessConsumer(WebsocketConsumer):
                 }
             )
 
-        elif action == 'abort_game':
-            pass
+        # elif action == 'abort_game':
+        #     pass
 
-        elif action == 'draw_request':
-            pass
+        # elif action == 'draw_request':
+        #     pass
+        else:
+            # Echo back any other action and its payload
+            self.send(text_data=json.dumps({
+                'game': {},
+                'message': {
+                    'type': 'only_me',
+                    'info': 'echo',
+                    'action': action,
+                    'payload': data,
+                    'player': {
+                        'user': user.username
+                    }
+                }
+            }))
 
     def game_send(self, event):
         message = event['message']
@@ -602,8 +623,15 @@ class ChessRoomConsumer(WebsocketConsumer):
             available_games = Game.objects.filter(status='waiting')
             games_list = [{
                 'game_id': game.room_id,
+                'format': game.format,
+                'clock': {
+                    'base': game.game_clock.total_time,
+                    'increment': game.game_clock.incremental_time,
+                    'started': game.game_clock.started_at.isoformat()
+                },
                 'player1': game.player1.username,
                 'player1_color': game.player1_color,
+                'player2': game.player2.username if game.player2 else None,
                 'player2_color': game.player2_color
             } for game in available_games]
 
