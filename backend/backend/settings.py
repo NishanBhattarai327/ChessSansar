@@ -160,7 +160,7 @@ if (os.environ.get("DJANGO_EMAIL_TO_CONSOLE", "False") == 'True'):
     if dev_flag: print("USING CONSOLE AS EMAIL RECEIVER")
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 else:
-    print("USING GMAIL AS EMAIL RECEIVER")
+    if dev_flag: print("USING GMAIL AS EMAIL RECEIVER")
     EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
     EMAIL_HOST = 'smtp.gmail.com'
     EMAIL_PORT = 587
