@@ -559,9 +559,15 @@ class ChessConsumer(WebsocketConsumer):
                     'type': 'game.send',
                     'game': {
                         'game_id': self.game_id,
+                        'fen': game.fen,
+                        'move': 'null',
+                        'player1': game.player1.username,
+                        'player1_color': game.player1_color,
+                        'player2': game.player2.username,
+                        'player2_color': game.player2_color,
+                        'current_turn': game.current_turn,
                         'status': game.status,
                         'winner': game.winner,
-                        'color': winner_color,
                         'over_type': game.over_type
                     },
                     'message': {
