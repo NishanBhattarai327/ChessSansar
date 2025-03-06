@@ -20,10 +20,16 @@ ALLOWED_HOSTS = ['*']
 
 
 # Application definition
+INSTALLED_APPS = []
 
-INSTALLED_APPS = [
+dev_flag = False  # flag to indicate where it is development or production
+if dev_flag:
+    INSTALLED_APPS += [
+        'daphne'
+    ]
+
+INSTALLED_APPS += [
     'corsheaders',
-    # 'daphne',  using uvicorn instead
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -139,8 +145,8 @@ DJOSER = {
     'PASSWORD_RESET_CONFIRM_URL': '/password/reset/confirm/{uid}/{token}',
     'USERNAME_RESET_CONFIRM_URL': '/username/reset/confirm/{uid}/{token}',
     'ACTIVATION_URL': 'activate/{uid}/{token}',
-    'SEND_ACTIVATION_EMAIL': True,
-    'SEND_CONFIRMATION_EMAIL':True,
+    'SEND_ACTIVATION_EMAIL': True if dev_flag else False,
+    'SEND_CONFIRMATION_EMAIL':True if dev_flag else False,
 }
 
 FRONTEND_API = os.environ.get('DJANGO_FRONTEND_API', None)
@@ -151,7 +157,7 @@ if FRONTEND_API is not None:
 
 # Email Configuration
 if (os.environ.get("DJANGO_EMAIL_TO_CONSOLE", "False") == 'True'):
-    print("USING CONSOLE AS EMAIL RECEIVER")
+    if dev_flag: print("USING CONSOLE AS EMAIL RECEIVER")
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 else:
     print("USING GMAIL AS EMAIL RECEIVER")

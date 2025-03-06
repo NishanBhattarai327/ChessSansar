@@ -5,6 +5,7 @@ import json
 from asgiref.sync import async_to_sync
 import chess
 
+dev_flag = False  # flag to indicate where it is development or production
 
 class ChessConsumer(WebsocketConsumer):
     def connect(self):
@@ -13,7 +14,7 @@ class ChessConsumer(WebsocketConsumer):
         user = self.scope['user']
 
         if user.username:
-            print(f"Connected to game {self.game_id} as {user.username}")
+            if dev_flag: print(f"Connected to game {self.game_id} as {user.username}")
  
             if self.room_group_name:
                 # Join the game group
@@ -35,7 +36,7 @@ class ChessConsumer(WebsocketConsumer):
             else:
                 self.close()
         else:
-            print(f"no user and received gameid = {self.game_id}")
+            if dev_flag: print(f"no user and received gameid = {self.game_id}")
             self.close()
     
     def disconnect(self, close_code):
@@ -52,7 +53,7 @@ class ChessConsumer(WebsocketConsumer):
                                 game.player2_connected = False
                             game.status = "waiting"
                             game.save()
-                            print(f"change => game : {game.room_id}  status to {game.status}, p1: {game.player1_connected} p2: {game.player2_connected}")
+                            if dev_flag: print(f"change => game : {game.room_id}  status to {game.status}, p1: {game.player1_connected} p2: {game.player2_connected}")
             async_to_sync(self.channel_layer.group_discard)(self.room_group_name, self.channel_name)
     
     def receive(self, text_data):
@@ -73,7 +74,7 @@ class ChessConsumer(WebsocketConsumer):
             return
         
         if action == 'create_game':
-            print(f"{user.username} : action: create_game")
+            if dev_flag: print(f"{user.username} : action: create_game")
             base = data.get('base', None)
             increment = data.get('increment', None)
             format = data.get('format', 'custom')
@@ -179,7 +180,7 @@ class ChessConsumer(WebsocketConsumer):
             }))
 
         elif action == 'join_game':
-            print(f"{user.username} : action: join_game")
+            if dev_flag: print(f"{user.username} : action: join_game")
             try:
                 game = Game.objects.get(room_id=self.game_id)
             except Game.DoesNotExist:
@@ -328,7 +329,7 @@ class ChessConsumer(WebsocketConsumer):
                 }))
         
         elif action == 'make_move':
-            print(f"{user.username} : action: make_move")
+            if dev_flag: print(f"{user.username} : action: make_move")
             try:
                 game = Game.objects.get(room_id=self.game_id)
                 color = game.player1_color if game.player1 == user else game.player2_color   # color of the move maker
@@ -412,7 +413,7 @@ class ChessConsumer(WebsocketConsumer):
 
             try:
                 move = data['move']
-                print(f'{user.username} :: make_move :: move : {move}')
+                if dev_flag: print(f'{user.username} :: make_move :: move : {move}')
 
                 board = chess.Board(fen=game.fen)
                 chess_move = chess.Move.from_uci(move)
@@ -446,18 +447,18 @@ class ChessConsumer(WebsocketConsumer):
                     over_type = ''
                     winner = ''
                     if outcome.winner == chess.WHITE:
-                        print("white won")
+                        if dev_flag: print("white won")
                         over_type = 'checkmate'
                         winner = 'player1' if game.player1_color == 'white' else 'player2'
 
                     elif outcome.winner == chess.BLACK:
                         over_type = 'checkmate'
                         winner = 'player1' if game.player1_color == 'black' else 'player2'
-                        print("black won")
+                        if dev_flag: print("black won")
 
                     else:
                         over_type = 'draw'
-                        print("draw")
+                        if dev_flag: print("draw")
                     game.status = 'ended'
                     game.over_type = over_type
                     game.winner = winner
@@ -617,7 +618,7 @@ class ChessRoomConsumer(WebsocketConsumer):
         user = self.scope['user']
 
         if user.username:
-            print(f"Connected to room {self.room_group_name} as {user.username}")
+            if dev_flag: print(f"Connected to room {self.room_group_name} as {user.username}")
 
             async_to_sync(self.channel_layer.group_add)(
                 self.room_group_name,
